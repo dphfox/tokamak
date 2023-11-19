@@ -57,9 +57,10 @@ function TokaCI.group(
 end
 
 function TokaCI.present()
-	print(`\n{stdio.color("yellow")}===== TEST RESULTS ====={stdio.color("reset")}\n`)
+	print(`{stdio.color("yellow")}===== TEST RESULTS ====={stdio.color("reset")}`)
 	local pass, fail = 0, 0
 	table.sort(testGroups, sortByName)
+	print()
 	for _, testGroup in testGroups do
 		print(testGroup.name)
 		for _, test in testGroup.tests do
