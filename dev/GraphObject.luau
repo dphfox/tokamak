@@ -32,6 +32,13 @@ function methods:use(
 	table.insert(upstream.users, self)
 end
 
+function methods:invalidate()
+	self.valid = false
+	for _, user in self.users do
+		user:invalidate()
+	end
+end
+
 function methods:destroy()
 	assert(#self.users == 0, `Object is still in use by {#self.users} others, so can't be destroyed (ID: destroyedInUse)`)
 	for _, using in self.using do
@@ -78,6 +85,39 @@ if not _G.BUNDLE then
 
 		main:destroy()
 		upstream:destroy()
+	end)
+
+	test(":invalidate() - a single object", function(prove)
+		local obj = GraphObject {
+			name = "obj"
+		}
+		obj.valid = true
+
+		obj:invalidate()
+
+		prove(obj.valid == false).holds()
+	end)
+
+	test(":invalidate() - downstream objects transitively", function(prove)
+		local obj = GraphObject {
+			name = "obj"
+		}
+		obj.valid = true
+		local downstream1 = GraphObject {
+			name = "downstream1"
+		}
+		downstream1.valid = true
+		downstream1:use(obj)
+		local downstream2 = GraphObject {
+			name = "downstream2"
+		}
+		downstream2.valid = true
+		downstream2:use(downstream1)
+		
+		obj:invalidate()
+
+		prove(downstream1.valid == false).holds()
+		prove(downstream2.valid == false).holds()
 	end)
 
 	test(":destroy() - disconnects used objects", function(prove)
