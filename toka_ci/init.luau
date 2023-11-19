@@ -75,7 +75,7 @@ function TokaCI.present()
 				local lineSource = getLineSource(test.err)
 				print(`        {test.err.message}`)
 				if lineSource ~= nil then
-					print(`        {stdio.color("cyan")}{string.gsub(string.gsub(lineSource, "^%s+",""), "%s+$","")}{stdio.color("reset")}`)
+					print(`        {stdio.color("black")}{test.err.lineNum} | {stdio.color("cyan")}{string.gsub(string.gsub(lineSource, "^%s+",""), "%s+$","")}{stdio.color("reset")}`)
 				end
 				print(`        {stdio.color("blue")}{string.gsub(test.err.trace, "\n\r?","\n        ")}{stdio.color("reset")}`)
 			end
