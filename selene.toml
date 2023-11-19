@@ -1,0 +1,5 @@
+std = "luau"
+
+[lints]
+# Because we use _G.XXYYZZ format for exposing build time variables via darklua.
+global_usage = "allow"
