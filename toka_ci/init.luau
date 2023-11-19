@@ -29,6 +29,13 @@ local TokaCI = {}
 function TokaCI.group(
 	groupName: string
 )
+	for _, group in testGroups do
+		if group.name == groupName then
+			--selene: allow(unused_variable)
+			return function(...) end
+		end
+	end
+
 	local testGroup: TestGroup = {
 		name = groupName,
 		tests = {}

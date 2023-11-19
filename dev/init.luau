@@ -6,7 +6,8 @@ if not _G.BUNDLE then
 end
 
 local Tokamak = {
-	GraphObject = require("GraphObject")
+	GraphObject = require("GraphObject"),
+	invalidate = require("invalidate")
 }
 
 if not _G.BUNDLE then

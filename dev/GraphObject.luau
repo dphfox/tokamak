@@ -10,9 +10,26 @@ local function GraphObject(props: {
 	return setmetatable({
 		type = "GraphObject",
 		name = props.name,
-		using = {},
-		users = {}
+		valid = false,
+		using = {} :: {GraphObject},
+		users = {} :: {GraphObject}
 	}, methods_mt)
+end
+
+export type GraphObject = typeof(GraphObject({ name = "" }))
+
+function methods:use(
+	upstream: GraphObject
+)
+	-- This check is excluded from the bundle because it would introduce linear
+	-- complexity to what should be a constant-time option, but it is still
+	-- useful to catch double-adds during development.
+	if not _G.BUNDLE then
+		assert(table.find(self.using, upstream) == nil, "Cannot use the same graph object twice (ID: objectUsedTwice)")
+		assert(table.find(upstream.users, self) == nil, "Cannot use the same graph object twice (ID: objectUsedTwice)")
+	end
+	table.insert(self.using, upstream)
+	table.insert(upstream.users, self)
 end
 
 function methods:destroy()
@@ -37,9 +54,30 @@ if not _G.BUNDLE then
 		prove(thing).matches({
 			type = "GraphObject",
 			name = "Joseph",
+			valid = false,
 			using = {},
 			users = {}
+		}, {
+			deepMatchObjects = true
 		})
+
+		thing:destroy()
+	end)
+
+	test(":use() - connects used objects", function(prove)
+		local upstream = GraphObject {
+			name = "upstream"
+		}
+		local main = GraphObject {
+			name = "main"
+		}
+		main:use(upstream)
+
+		prove(main.using).matches({upstream})
+		prove(upstream.users).matches({main})
+
+		main:destroy()
+		upstream:destroy()
 	end)
 
 	test(":destroy() - disconnects used objects", function(prove)
@@ -49,12 +87,14 @@ if not _G.BUNDLE then
 		local main = GraphObject {
 			name = "main"
 		}
-		table.insert(upstream.users, main)
-		table.insert(main.using, upstream)
+		main:use(upstream)
 		main:destroy()
 
 		prove(main.using).matches({})
 		prove(upstream.users).matches({})
+
+		main:destroy()
+		upstream:destroy()
 	end)
 
 	test(":destroy() - fails when users still present", function(prove)
@@ -64,12 +104,12 @@ if not _G.BUNDLE then
 		local downstream = GraphObject {
 			name = "downstream"
 		}
-		table.insert(main.users, downstream)
-		table.insert(downstream.using, main)
+		downstream:use(main)
 		
 		prove(function()
 			main:destroy()
 		end).throws("destroyedInUse")
+		
 		downstream:destroy()
 		main:destroy()
 	end)

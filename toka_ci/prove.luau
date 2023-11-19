@@ -11,9 +11,10 @@ local function prove(
 			assert(x == true, "Proof did not hold true")
 		end,
 		matches = function(
-			y: any
+			y: any,
+			options: doesMatch.Options?
 		)
-			assert(doesMatch(x, y), "Structures did not match")
+			assert(doesMatch(x, y, options or {}), "Structures did not match")
 		end,
 		throws = function(
 			substring: string?
