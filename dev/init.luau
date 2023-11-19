@@ -7,7 +7,8 @@ end
 
 local Tokamak = {
 	GraphObject = require("GraphObject"),
-	Value = require("Value")
+	Value = require("Value"),
+	Computed = require("Computed")
 }
 
 if not _G.BUNDLE then

@@ -28,6 +28,7 @@ export type StateObject<T> = {
 	type: "StateObject",
 	name: string,
 	graph: GraphObject,
+	__phantom_data: (never) -> T,
 
 	peek: (
 		self: StateObject<T>
@@ -37,6 +38,11 @@ export type StateObject<T> = {
 	) -> ()
 }
 
+export type CanBeState<T> = StateObject<T> | T
+
+-- The `| T` must go afterwards, or else the Luau Gods will smite you.
+export type Use = <T>(CanBeState<T>) -> T
+
 export type Value<R, W = R> = StateObject<R | W> & {
 	value: W,
 
@@ -44,6 +50,12 @@ export type Value<R, W = R> = StateObject<R | W> & {
 		self: Value<R, W>,
 		newValue: W
 	) -> ()
+}
+
+export type Computed<T> = StateObject<T> & {
+	processor: (Use) -> T,
+	cachedValue: T?,
+	useCallback: Use
 }
 
 return nil

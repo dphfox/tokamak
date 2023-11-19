@@ -65,7 +65,8 @@ function TokaCI.present()
 		print(testGroup.name)
 		for _, test in testGroup.tests do
 			local colour = if test.err == nil then stdio.color("green") else stdio.color("red")
-			print(`    {colour}{test.name}{stdio.color("reset")}`)
+			local symbol = if test.err == nil then "✓" else "✕"
+			print(`    {colour}{symbol} {test.name}{stdio.color("reset")}`)
 			if test.err == nil then
 				pass += 1
 			else

@@ -13,29 +13,24 @@ local function GraphObject(props: {
 	name: string,
 	validator: () -> ()
 }): GraphObject
-	return setmetatable({
-		type = "GraphObject",
-		name = props.name,
-		valid = false,
-		validator = props.validator,
-		using = {} :: {GraphObject},
-		users = {} :: {GraphObject}
-	}, methods_mt) :: any
+	local self = {}
+	self.type = "GraphObject"
+	self.name = props.name
+	self.valid = false
+	self.validator = props.validator
+	self.using = {} :: {GraphObject}
+	self.users = {} :: {GraphObject}
+	return setmetatable(self, methods_mt) :: any
 end
 
 function methods.use(
 	self: GraphObject,
 	upstream: GraphObject
 )
-	-- This check is excluded from the bundle because it would introduce linear
-	-- complexity to what should be a constant-time option, but it is still
-	-- useful to catch double-adds during development.
-	if not _G.BUNDLE then
-		assert(table.find(self.using, upstream) == nil, "Cannot use the same graph object twice (ID: objectUsedTwice)")
-		assert(table.find(upstream.users, self) == nil, "Cannot use the same graph object twice (ID: objectUsedTwice)")
+	if table.find(self.using, upstream) == nil then
+		table.insert(self.using, upstream)
+		table.insert(upstream.users, self)
 	end
-	table.insert(self.using, upstream)
-	table.insert(upstream.users, self)
 end
 
 function methods.invalidate(
@@ -81,7 +76,9 @@ end
 if not _G.BUNDLE then
 	local test = _G.TokaCI.group("GraphObject")
 
-	test("constructor - returns correct data structure", function(prove: (any) -> any)
+	test("constructor - returns correct data structure", function(
+		prove: (any) -> any
+	)
 		local thing = GraphObject {
 			name = "Joseph",
 			validator = noop
@@ -101,7 +98,9 @@ if not _G.BUNDLE then
 		thing:destroy()
 	end)
 
-	test(":use() - connects used objects", function(prove: (any) -> any)
+	test(":use() - connects used objects", function(
+		prove: (any) -> any
+	)
 		local upstream = GraphObject {
 			name = "upstream",
 			validator = noop
@@ -118,7 +117,9 @@ if not _G.BUNDLE then
 		upstream:destroy()
 	end)
 
-	test(":invalidate() - a single object", function(prove: (any) -> any)
+	test(":invalidate() - a single object", function(
+		prove: (any) -> any
+	)
 		local obj = GraphObject {
 			name = "obj",
 			validator = noop
@@ -130,7 +131,9 @@ if not _G.BUNDLE then
 		prove(obj.valid == false).holds()
 	end)
 
-	test(":invalidate() - can be called multiple times with no change", function(prove: (any) -> any)
+	test(":invalidate() - can be called multiple times with no change", function(
+		prove: (any) -> any
+	)
 		local obj = GraphObject {
 			name = "obj",
 			validator = noop
@@ -144,7 +147,9 @@ if not _G.BUNDLE then
 		prove(obj.valid == false).holds()
 	end)
 
-	test(":invalidate() - downstream objects transitively", function(prove: (any) -> any)
+	test(":invalidate() - downstream objects transitively", function(
+		prove: (any) -> any
+	)
 		local obj = GraphObject {
 			name = "obj",
 			validator = noop
@@ -169,7 +174,9 @@ if not _G.BUNDLE then
 		prove(downstream2.valid == false).holds()
 	end)
 
-	test(":invalidate() - stops using upstream objects", function(prove: (any) -> any)
+	test(":invalidate() - stops using upstream objects", function(
+		prove: (any) -> any
+	)
 		local upstream = GraphObject {
 			name = "upstream",
 			validator = noop
@@ -187,7 +194,9 @@ if not _G.BUNDLE then
 		prove(upstream.users).matches({})
 	end)
 
-	test(":validate() - calls the validator function", function(prove: (any) -> any)
+	test(":validate() - calls the validator function", function(
+		prove: (any) -> any
+	)
 		local called = false
 		local obj = GraphObject {
 			name = "obj",
@@ -201,7 +210,9 @@ if not _G.BUNDLE then
 		prove(called).holds()
 	end)
 
-	test(":validate() - can be called multiple times without change", function(prove: (any) -> any)
+	test(":validate() - can be called multiple times without change", function(
+		prove: (any) -> any
+	)
 		local calledTimes = 0
 		local obj = GraphObject {
 			name = "obj",
@@ -217,7 +228,9 @@ if not _G.BUNDLE then
 		prove(calledTimes == 1).holds()
 	end)
 
-	test(":destroy() - disconnects used objects", function(prove: (any) -> any)
+	test(":destroy() - disconnects used objects", function(
+		prove: (any) -> any
+	)
 		local upstream = GraphObject {
 			name = "upstream",
 			validator = noop
@@ -235,7 +248,9 @@ if not _G.BUNDLE then
 		upstream:destroy()
 	end)
 
-	test(":destroy() - fails when users still present", function(prove: (any) -> any)
+	test(":destroy() - fails when users still present", function(
+		prove: (any) -> any
+	)
 		local main = GraphObject {
 			name = "main",
 			validator = noop

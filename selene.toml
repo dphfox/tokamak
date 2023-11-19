@@ -3,3 +3,6 @@ std = "luau"
 [lints]
 # Because we use _G.XXYYZZ format for exposing build time variables via darklua.
 global_usage = "allow"
+# Because this is common practice when defining processor callbacks, since it
+# prevents you from accidentally using values from outside your scope.
+shadowing = "allow"
