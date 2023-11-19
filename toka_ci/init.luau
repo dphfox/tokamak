@@ -5,6 +5,7 @@ local stdio = require("@lune/stdio")
 
 local prove = require("prove")
 local parseError = require("parseError")
+local getLineSource = require("getLineSource")
 
 type TestGroup = {
 	name: string,
@@ -71,7 +72,11 @@ function TokaCI.present()
 				pass += 1
 			else
 				fail += 1
+				local lineSource = getLineSource(test.err)
 				print(`        {test.err.message}`)
+				if lineSource ~= nil then
+					print(`        {stdio.color("cyan")}{string.gsub(string.gsub(lineSource, "^%s+",""), "%s+$","")}{stdio.color("reset")}`)
+				end
 				print(`        {stdio.color("blue")}{string.gsub(test.err.trace, "\n\r?","\n        ")}{stdio.color("reset")}`)
 			end
 		end

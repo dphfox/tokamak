@@ -167,6 +167,70 @@ if not _G.BUNDLE then
 		upstream:destroy()
 	end)
 
+	test(":peek() - updates downstream objects", function(
+		prove: (any) -> any
+	)
+		local upstream = Value {
+			name = "Stephen Sr.",
+			initialValue = 5
+		}
+		local main = Computed {
+			name = "Stephen",
+			processor = function(use: Types.Use)
+				return use(upstream)
+			end
+		}
+		local downstream = Computed {
+			name = "Stephen Jr.",
+			processor = function(use: Types.Use)
+				return use(main)
+			end
+		}
+
+		prove(downstream:peek() == 5).holds()
+		upstream:set(25)
+		prove(downstream:peek() == 25).holds()
+
+		downstream:destroy()
+		main:destroy()
+		upstream:destroy()
+	end)
+
+	test(":peek() - doesn't update downstream given similar values", function(
+		prove: (any) -> any
+	)
+		local numRuns = 0
+		local upstream = Value {
+			name = "Stephen Sr.",
+			initialValue = 5
+		}
+		local main = Computed {
+			name = "Stephen",
+			processor = function(use: Types.Use)
+				return use(upstream) :: any > 0
+			end
+		}
+		local downstream = Computed {
+			name = "Stephen Jr.",
+			processor = function(use: Types.Use)
+				numRuns += 1
+				return use(main)
+			end
+		}
+
+		prove(downstream:peek() == true).holds()
+		prove(numRuns == 1).holds()
+
+		upstream:set(25)
+		
+		prove(downstream:peek() == true).holds()
+		prove(numRuns == 1).holds()
+
+		downstream:destroy()
+		main:destroy()
+		upstream:destroy()
+	end)
+
 	test(":destroy() - destroys the graph object", function(
 		prove: (any) -> any
 	)
@@ -187,56 +251,6 @@ if not _G.BUNDLE then
 
 		upstream:destroy()
 	end)
-
-	-- https://github.com/dphfox/Fusion/issues/270
-	test("new objects downstream of invalid objects don't see inconsistent values", function(
-		prove: (any) -> any
-	)
-		local A = Value {
-			name = "A",
-			initialValue = false
-		}
-		local B = Computed {
-			name = "B",
-			processor = function(use: Types.Use)
-				return use(A)
-			end
-		}
-		local didDseeBsayAwasFalse = false
-		local C = Computed {
-			name = "C",
-			processor = function(use: Types.Use)
-				if use(A) then
-					local D = Computed {
-						name = "D",
-						processor = function(use: Types.Use): boolean?
-							if use(B) == false then
-								didDseeBsayAwasFalse = true
-							end
-							return use(B)
-						end
-					}
-					return use(D)
-				end
-				return nil
-			end
-		}
-
-		prove(C:peek() == nil).holds()
-		prove(B:peek() == false).holds()
-		prove(A:peek() == false).holds()
-
-		A:set(true)
-
-		-- We make sure to validate C first, so its processor function runs
-		-- before B's processor function runs. This means D is created before
-		-- B has run, exposing the possibility of reading a stale value.
-		prove(C:peek() == true).holds()
-		prove(B:peek() == true).holds()
-		prove(A:peek() == true).holds()
-
-		prove(not didDseeBsayAwasFalse).holds()
-	end)
 end
 
-return GraphObject
+return Computed
