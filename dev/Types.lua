@@ -5,13 +5,17 @@ export type GraphObject = {
 	type: "GraphObject",
 	name: string,
 	valid: boolean,
-	validator: () -> (),
-	using: {GraphObject},
-	users: {GraphObject},
+	lastVisibleDifference: number,
+	validator: () -> boolean,
+	using: {[GraphObject]: true},
+	users: {[GraphObject]: true},
 
 	use: (
 		self: GraphObject,
 		upstream: GraphObject
+	) -> (),
+	unuseAll: (
+		self: GraphObject
 	) -> (),
 	invalidate: (
 		self: GraphObject
@@ -28,7 +32,6 @@ export type StateObject<T> = {
 	type: "StateObject",
 	name: string,
 	graph: GraphObject,
-	__phantom_data: (never) -> T,
 
 	peek: (
 		self: StateObject<T>

@@ -4,6 +4,8 @@
 local GraphObject = require("GraphObject")
 local Types = require("Types")
 
+local visiblyDifferent = require("visiblyDifferent")
+
 local methods = {}
 local methods_mt = {__index = methods}
 
@@ -20,9 +22,11 @@ local function Computed<T>(props: {
 			-- Because this validator and the use callback function cyclically
 			-- depend on each other, this doesn't type check, so we skip the
 			-- checks here and manually guarantee they exist.
-			local processor = (self :: any).processor
-			local useCallback = (self :: any).useCallback
-			self.cachedValue = processor(useCallback)
+			local self = (self :: any) :: Types.Computed<T>
+			self.graph:unuseAll()
+			local oldValue = self.cachedValue
+			self.cachedValue = self.processor(self.useCallback)
+			return visiblyDifferent(oldValue, self.cachedValue)
 		end
 	}
 	self.processor = props.processor
@@ -167,6 +171,41 @@ if not _G.BUNDLE then
 		upstream:destroy()
 	end)
 
+	test(":peek() - dynamically adjusts used objects", function(
+		prove: (any) -> any
+	)
+		local condition = Value {
+			name = "condition",
+			initialValue = false
+		}
+		local whenTrue = Value {
+			name = "whenTrue",
+			initialValue = 2
+		}
+		local whenFalse = Value {
+			name = "whenFalse",
+			initialValue = 5
+		}
+		local main = Computed {
+			name = "Stephen",
+			processor = function(use: Types.Use)
+				return if use(condition) then use(whenTrue) else use(whenFalse)
+			end
+		}
+
+		main:peek()
+		prove(main.graph.using).matches({[condition.graph] = true, [whenFalse.graph] = true})
+		
+		condition:set(true)
+		main:peek()
+		prove(main.graph.using).matches({[condition.graph] = true, [whenTrue.graph] = true})
+
+		main:destroy()
+		whenFalse:destroy()
+		whenTrue:destroy()
+		condition:destroy()
+	end)
+
 	test(":peek() - updates downstream objects", function(
 		prove: (any) -> any
 	)
@@ -222,7 +261,7 @@ if not _G.BUNDLE then
 		prove(numRuns == 1).holds()
 
 		upstream:set(25)
-		
+
 		prove(downstream:peek() == true).holds()
 		prove(numRuns == 1).holds()
 

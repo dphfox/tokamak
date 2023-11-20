@@ -53,13 +53,13 @@ if not _G.BUNDLE then
 		prove(B:peek() == false).holds()
 		prove(A:peek() == false).holds()
 
-		prove(B.graph.valid).holds()
-		prove(C.graph.valid).holds()
+		prove(B.graph.valid == true).holds()
+		prove(C.graph.valid == true).holds()
 
 		A:set(true)
 
-		prove(not B.graph.valid).holds()
-		prove(not C.graph.valid).holds()
+		prove(B.graph.valid == false).holds()
+		prove(C.graph.valid == false).holds()
 
 		-- We make sure to validate C first, so its processor function runs
 		-- before B's processor function runs. This means D is created before

@@ -1,7 +1,6 @@
 --!strict
 --Licensed from @dphfox/tokamak under MIT
 
-local noop = require("noop")
 local Types = require("Types")
 
 type GraphObject = Types.GraphObject
@@ -17,9 +16,10 @@ local function GraphObject(props: {
 	self.type = "GraphObject"
 	self.name = props.name
 	self.valid = false
+	self.lastVisibleDifference = 0
 	self.validator = props.validator
-	self.using = {} :: {GraphObject}
-	self.users = {} :: {GraphObject}
+	self.using = {} :: {[GraphObject]: true}
+	self.users = {} :: {[GraphObject]: true}
 	return setmetatable(self, methods_mt) :: any
 end
 
@@ -27,10 +27,17 @@ function methods.use(
 	self: GraphObject,
 	upstream: GraphObject
 )
-	if table.find(self.using, upstream) == nil then
-		table.insert(self.using, upstream)
-		table.insert(upstream.users, self)
+	self.using[upstream] = true
+	upstream.users[self] = true
+end
+
+function methods.unuseAll(
+	self: GraphObject
+)
+	for using in self.using do
+		using.users[self] = nil
 	end
+	table.clear(self.using)
 end
 
 function methods.invalidate(
@@ -38,14 +45,7 @@ function methods.invalidate(
 )
 	if self.valid then
 		self.valid = false
-		for _, using in self.using do
-			local index = table.find(using.users, self)
-			if index ~= nil then
-				table.remove(using.users, index)
-			end
-		end
-		table.clear(self.using)
-		for _, user in self.users do
+		for user in self.users do
 			user:invalidate()
 		end
 	end
@@ -55,7 +55,10 @@ function methods.validate(
 	self: GraphObject
 )
 	if not self.valid then
-		self.validator()
+		local visiblyDifferent = self.validator()
+		if visiblyDifferent then
+			self.lastVisibleDifference = os.clock()
+		end
 		self.valid = true
 	end
 end
@@ -63,32 +66,31 @@ end
 function methods.destroy(
 	self: GraphObject
 )
-	assert(#self.users == 0, `Object is still in use by {#self.users} others, so can't be destroyed (ID: destroyedInUse)`)
-	for _, using in self.using do
-		local index = table.find(using.users, self)
-		if index ~= nil then
-			table.remove(using.users, index)
-		end
-	end
-	table.clear(self.using)
+	assert(next(self.users) == nil, `Object is still in use, so can't be destroyed (ID: destroyedInUse)`)
+	self:unuseAll()
 end
 
 if not _G.BUNDLE then
 	local test = _G.TokaCI.group("GraphObject")
+
+	local function alwaysVisiblyDifferent()
+		return true
+	end
 
 	test("constructor - returns correct data structure", function(
 		prove: (any) -> any
 	)
 		local thing = GraphObject {
 			name = "Joseph",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 
 		prove(thing).matches({
 			type = "GraphObject",
 			name = "Joseph",
-			validator = noop,
 			valid = false,
+			lastVisibleDifference = 0,
+			validator = alwaysVisiblyDifferent,
 			users = {},
 			using = {}
 		}, {
@@ -103,15 +105,15 @@ if not _G.BUNDLE then
 	)
 		local upstream = GraphObject {
 			name = "upstream",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		local main = GraphObject {
 			name = "main",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		main:use(upstream)
 
-		prove(upstream.users).matches({main})
+		prove(upstream.users).matches({[main] = true})
 
 		main:destroy()
 		upstream:destroy()
@@ -122,7 +124,7 @@ if not _G.BUNDLE then
 	)
 		local obj = GraphObject {
 			name = "obj",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		obj:validate()
 
@@ -136,7 +138,7 @@ if not _G.BUNDLE then
 	)
 		local obj = GraphObject {
 			name = "obj",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		obj:validate()
 
@@ -152,18 +154,18 @@ if not _G.BUNDLE then
 	)
 		local obj = GraphObject {
 			name = "obj",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		obj:validate()
 		local downstream1 = GraphObject {
 			name = "downstream1",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		downstream1:validate()
 		downstream1:use(obj)
 		local downstream2 = GraphObject {
 			name = "downstream2",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		downstream2:validate()
 		downstream2:use(downstream1)
@@ -174,27 +176,27 @@ if not _G.BUNDLE then
 		prove(downstream2.valid == false).holds()
 	end)
 
-	test(":invalidate() - stops using upstream objects", function(
+	test(":invalidate() - does not stop using upstream objects", function(
 		prove: (any) -> any
 	)
 		local upstream = GraphObject {
 			name = "upstream",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		local main = GraphObject {
 			name = "main",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		main:use(upstream)
 		main:validate()
 
 		main:invalidate()
 
-		prove(main.using).matches({})
-		prove(upstream.users).matches({})
+		prove(main.using).matches({[upstream] = true})
+		prove(upstream.users).matches({[main] = true})
 	end)
 
-	test(":validate() - calls the validator function", function(
+	test(":validate() - performs trivial validation", function(
 		prove: (any) -> any
 	)
 		local called = false
@@ -208,6 +210,7 @@ if not _G.BUNDLE then
 		obj:validate()
 		
 		prove(called).holds()
+		prove(obj.valid == true).holds()
 	end)
 
 	test(":validate() - can be called multiple times without change", function(
@@ -228,24 +231,101 @@ if not _G.BUNDLE then
 		prove(calledTimes == 1).holds()
 	end)
 
-	test(":destroy() - disconnects used objects", function(
+	test(":validate() - records the last visible difference", function(
 		prove: (any) -> any
 	)
-		local upstream = GraphObject {
-			name = "upstream",
-			validator = noop
+		local returnVisiblyDifferent = false
+		local obj = GraphObject {
+			name = "obj",
+			validator = function()
+				return returnVisiblyDifferent
+			end
+		}
+
+		-- The first run must always be visibly different, even
+		-- if the validator returns otherwise.
+		local previousTime = obj.lastVisibleDifference
+		obj:validate()
+		prove(obj.lastVisibleDifference ~= previousTime).holds()
+
+		previousTime = obj.lastVisibleDifference
+		obj:invalidate()
+		obj:validate()
+		prove(obj.lastVisibleDifference == previousTime).holds()
+
+		previousTime = obj.lastVisibleDifference
+		returnVisiblyDifferent = true
+		obj:invalidate()
+		obj:validate()
+		prove(obj.lastVisibleDifference > previousTime).holds()
+	end)
+
+	test(":unuseAll() - unuses all used objects", function(
+		prove: (any) -> any
+	)
+		local upstream1 = GraphObject {
+			name = "upstream1",
+			validator = alwaysVisiblyDifferent
+		}
+		local upstream2 = GraphObject {
+			name = "upstream2",
+			validator = alwaysVisiblyDifferent
+		}
+		local upstream3 = GraphObject {
+			name = "upstream3",
+			validator = alwaysVisiblyDifferent
 		}
 		local main = GraphObject {
 			name = "main",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
-		main:use(upstream)
+		main:use(upstream1)
+		main:use(upstream2)
+		main:use(upstream3)
+		main:unuseAll()
+
+		prove(upstream1.users).matches({})
+		prove(upstream2.users).matches({})
+		prove(upstream3.users).matches({})
+		prove(main.using).matches({})
+
+		main:destroy()
+		upstream1:destroy()
+		upstream2:destroy()
+		upstream3:destroy()
+	end)
+
+	test(":destroy() - calls :unuseAll()", function(
+		prove: (any) -> any
+	)
+		local upstream1 = GraphObject {
+			name = "upstream1",
+			validator = alwaysVisiblyDifferent
+		}
+		local upstream2 = GraphObject {
+			name = "upstream2",
+			validator = alwaysVisiblyDifferent
+		}
+		local upstream3 = GraphObject {
+			name = "upstream3",
+			validator = alwaysVisiblyDifferent
+		}
+		local main = GraphObject {
+			name = "main",
+			validator = alwaysVisiblyDifferent
+		}
+		main:use(upstream1)
+		main:use(upstream2)
+		main:use(upstream3)
 		main:destroy()
 
-		prove(upstream.users).matches({})
+		prove(upstream1.users).matches({})
+		prove(upstream2.users).matches({})
+		prove(upstream3.users).matches({})
 
-		main:destroy()
-		upstream:destroy()
+		upstream1:destroy()
+		upstream2:destroy()
+		upstream3:destroy()
 	end)
 
 	test(":destroy() - fails when users still present", function(
@@ -253,11 +333,11 @@ if not _G.BUNDLE then
 	)
 		local main = GraphObject {
 			name = "main",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		local downstream = GraphObject {
 			name = "downstream",
-			validator = noop
+			validator = alwaysVisiblyDifferent
 		}
 		downstream:use(main)
 		

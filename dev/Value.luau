@@ -1,13 +1,16 @@
 --!strict
 --Licensed from @dphfox/tokamak under MIT
 
-local noop = require("noop")
-local isSimilar = require("isSimilar")
+local visiblyDifferent = require("visiblyDifferent")
 local GraphObject = require("GraphObject")
 local Types = require("Types")
 
 local methods = {}
 local methods_mt = {__index = methods}
+
+local function alwaysVisiblyDifferent()
+	return true
+end
 
 local function Value<W>(props: {
 	name: string,
@@ -18,7 +21,7 @@ local function Value<W>(props: {
 	self.name = props.name
 	self.graph = GraphObject {
 		name = props.name,
-		validator = noop
+		validator = alwaysVisiblyDifferent
 	}
 	-- Because value objects never have dependencies, they're always valid and
 	-- should never be left invalid after any operation, becaues their value is
@@ -38,7 +41,7 @@ function methods.set<R, W>(
 	self: Types.Value<R, W>,
 	newValue: W
 )
-	if isSimilar(self.value, newValue) then
+	if not visiblyDifferent(self.value, newValue) then
 		return
 	end
 	self.value = newValue
@@ -122,7 +125,7 @@ if not _G.BUNDLE then
 		downstream:validate()
 
 		main:set(25)
-		prove(not downstream.valid).holds()
+		prove(downstream.valid == false).holds()
 
 		downstream:destroy()
 		main:destroy()
@@ -143,7 +146,7 @@ if not _G.BUNDLE then
 		downstream:validate()
 
 		main:set(5)
-		prove(downstream.valid).holds()
+		prove(downstream.valid == true).holds()
 
 		downstream:destroy()
 		main:destroy()
