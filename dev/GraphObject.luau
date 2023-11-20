@@ -16,7 +16,7 @@ local function GraphObject(props: {
 	self.type = "GraphObject"
 	self.name = props.name
 	self.valid = false
-	self.lastVisibleDifference = 0
+	self.lastVisibleDifference = nil
 	self.validator = props.validator
 	self.using = {} :: {[GraphObject]: true}
 	self.users = {} :: {[GraphObject]: true}
@@ -56,7 +56,7 @@ function methods.validate(
 )
 	if not self.valid then
 		local visiblyDifferent = self.validator()
-		if visiblyDifferent or self.lastVisibleDifference == 0 then
+		if visiblyDifferent or self.lastVisibleDifference == nil then
 			self.lastVisibleDifference = os.clock()
 		end
 		self.valid = true
@@ -89,7 +89,7 @@ if not _G.BUNDLE then
 			type = "GraphObject",
 			name = "Joseph",
 			valid = false,
-			lastVisibleDifference = 0,
+			lastVisibleDifference = nil,
 			validator = alwaysVisiblyDifferent,
 			users = {},
 			using = {}

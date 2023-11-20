@@ -5,7 +5,7 @@ export type GraphObject = {
 	type: "GraphObject",
 	name: string,
 	valid: boolean,
-	lastVisibleDifference: number,
+	lastVisibleDifference: number?,
 	validator: () -> boolean,
 	using: {[GraphObject]: true},
 	users: {[GraphObject]: true},

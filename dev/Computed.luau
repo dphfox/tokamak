@@ -23,10 +23,27 @@ local function Computed<T>(props: {
 			-- depend on each other, this doesn't type check, so we skip the
 			-- checks here and manually guarantee they exist.
 			local self = (self :: any) :: Types.Computed<T>
-			self.graph:unuseAll()
-			local oldValue = self.cachedValue
-			self.cachedValue = self.processor(self.useCallback)
-			return visiblyDifferent(oldValue, self.cachedValue)
+			local lastVisibleDifference = self.graph.lastVisibleDifference
+			local process = true
+			if lastVisibleDifference ~= nil then
+				process = false
+				for using in self.graph.using do
+					using:validate()
+					if using.lastVisibleDifference > lastVisibleDifference then
+						process = true
+						self.graph:unuseAll()
+						break
+					end
+				end
+			end
+
+			if process then
+				local oldValue = self.cachedValue
+				self.cachedValue = self.processor(self.useCallback)
+				return visiblyDifferent(oldValue, self.cachedValue)
+			else
+				return false
+			end
 		end
 	}
 	self.processor = props.processor
@@ -240,17 +257,17 @@ if not _G.BUNDLE then
 	)
 		local numRuns = 0
 		local upstream = Value {
-			name = "Stephen Sr.",
+			name = "upstream",
 			initialValue = 5
 		}
 		local main = Computed {
-			name = "Stephen",
+			name = "main",
 			processor = function(use: Types.Use)
 				return use(upstream) :: any > 0
 			end
 		}
 		local downstream = Computed {
-			name = "Stephen Jr.",
+			name = "downstream",
 			processor = function(use: Types.Use)
 				numRuns += 1
 				return use(main)
@@ -268,6 +285,7 @@ if not _G.BUNDLE then
 		downstream:destroy()
 		main:destroy()
 		upstream:destroy()
+		
 	end)
 
 	test(":destroy() - destroys the graph object", function(
@@ -278,7 +296,7 @@ if not _G.BUNDLE then
 			validator = function() end
 		}
 		local thing = Computed {
-			name = "Stephen",
+			name = "thing",
 			processor = function()
 				return 5
 			end
