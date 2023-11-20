@@ -56,7 +56,7 @@ function methods.validate(
 )
 	if not self.valid then
 		local visiblyDifferent = self.validator()
-		if visiblyDifferent then
+		if visiblyDifferent or self.lastVisibleDifference == 0 then
 			self.lastVisibleDifference = os.clock()
 		end
 		self.valid = true
